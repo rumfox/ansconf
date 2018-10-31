@@ -1,0 +1,102 @@
+###############################################################################################################
+# 1. Program      : wex_dummy_proc_clear.yml
+# 2. Description  : WEX Dummy 프로세스 Clear PlayBook 
+# 3. Creator      : Lee Sang Hyoung
+# 4. Syntax       : ansible-playbook wex_dummy_proc_clear.yml
+#                 : wex_service_start.yml에서 async 호출 
+###############################################################################################################
+---
+- hosts: lcia-dnawex01
+  remote_user: admin
+  become_user: esadmin
+  become: true
+  become_method: sudo
+
+  tasks:
+    ######################################
+    # Dummy process kill 1
+    ######################################
+    - name: "WEX Dummy Process Confirm 1"
+      shell: |
+        . /opt/IBM/es/nodeinfo/esprofile
+        esadmin check | grep Main6.searcher.node2.node1 | awk '{print $3}'
+      register: statuscheck
+      ignore_errors: yes
+      until:
+        statuscheck.stdout.find("-") == -1
+      retries: 180
+      delay: 5
+
+    - name: "WEX Dummy Process Kill 1"
+      shell: |
+        . /opt/IBM/es/nodeinfo/esprofile
+        esadmin Main6.searcher.node2.node1 stop
+      register: job_result
+      ignore_errors: yes
+      when: statuscheck.stdout.find('-') == -1
+
+    - name: "WEX Dummy Process kill status 1 "
+      debug:
+        msg:
+          - "{{ job_result.stdout }}"
+          - "Ѱ {{ lookup('pipe','date +%Y-%m-%d/%H:%M:%S') }}"
+      when: statuscheck.stdout.find('-') == -1
+
+    ######################################
+    # Dummy process kill 2
+    ######################################
+    - name: "WEX Dummy Process Confirm 2"
+      shell: |
+        . /opt/IBM/es/nodeinfo/esprofile
+        esadmin check | grep Main6.searcher.node3.node2 | awk '{print $3}'
+      register: statuscheck
+      ignore_errors: yes
+      until:
+        statuscheck.stdout.find("-") == -1
+      retries: 180
+      delay: 5
+
+    - name: "WEX Dummy Process Kill 2"
+      shell: |
+        . /opt/IBM/es/nodeinfo/esprofile
+        esadmin Main6.searcher.node3.node2 stop
+      register: job_result
+      ignore_errors: yes
+      when: statuscheck.stdout.find('-') == -1
+
+    - name: "WEX Dummy Process kill status 2 "
+      debug:
+        msg:
+          - "{{ job_result.stdout }}"
+          - "Ѱ {{ lookup('pipe','date +%Y-%m-%d/%H:%M:%S') }}"
+      when: statuscheck.stdout.find('-') == -1
+ 
+    ######################################
+    # Dummy process kill 3
+    ######################################
+    - name: "WEX Dummy Process Confirm 3"
+      shell: |
+        . /opt/IBM/es/nodeinfo/esprofile
+        esadmin check | grep Main6.searcher.node1.node3 | awk '{print $3}'
+      register: statuscheck
+      ignore_errors: yes
+      until:
+        statuscheck.stdout.find("-") == -1
+      retries: 180
+      delay: 5
+
+    - name: "WEX Dummy Process Kill 3"
+      shell: |
+        . /opt/IBM/es/nodeinfo/esprofile
+        esadmin Main6.searcher.node1.node3 stop
+      register: job_result
+      ignore_errors: yes
+      when: statuscheck.stdout.find('-') == -1
+
+    - name: "WEX Dummy Process kill status 3 "
+      debug:
+        msg:
+          - "{{ job_result.stdout }}"
+          - "Ѱ {{ lookup('pipe','date +%Y-%m-%d/%H:%M:%S') }}"
+      when: statuscheck.stdout.find('-') == -1
+

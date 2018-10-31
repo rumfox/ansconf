@@ -1,0 +1,75 @@
+# #########################################################################################
+# Program  : wex_file_work.yml
+# Creator  : Lee Sang Hyoung
+# Syntax   : ansible-playbook wex_file_work.yml -t NAME
+# 작업내용 : WEX 인덱싱파일 이름 변경(임시)
+# Woking Server : WEX 01,02,03,04,05,06번
+# #########################################################################################
+---
+#- hosts: lcia-dnawex01,lcia-dnawex02,lcia-dnawex03
+- hosts: lcia-dnawex01,lcia-dnawex02,lcia-dnawex03,lcia-dnawex04,lcia-dnawex05,lcia-dnawex06
+  remote_user: admin
+  become_user: esadmin
+  become: true
+  become_method: sudo
+  tags:
+    - NAME
+  tasks:
+    #######################################################
+    # WEX 인덱싱파일 이름 변경(임시적용)
+    # 인덱싱 파일명 "Main6"추가 --> Copy --> 기존파일 삭제
+    #######################################################
+    - name: "▶ 10-1. Passit Export Data - 파일네임 변경"
+      shell: ls /home/esadmin/esdata/export/ExportLCIA__2*
+      register: files_to_rename
+
+    - copy:
+        src: "{{ item.1 }}"
+        dest: "/home/esadmin/esdata/export/ExportLCIA_Main6_{{ item.1[40:] }}"
+        remote_src: yes
+      with_indexed_items: "{{ files_to_rename.stdout_lines }}"
+
+    - file:
+        path: "{{ item }}"
+        state: absent
+      with_items: "{{ files_to_rename.stdout_lines }}"
+
+###############################################################################
+# 작업내용 : WEX 컬렉션 크롤링, 인덱싱 데이터 DNA 랜딩존 이동 및 Searcher 시작
+# Woking Server : WEX 01번
+###############################################################################
+- hosts: lcia-dnawex01
+  remote_user: admin
+  become_user: esadmin
+  become: true
+  become_method: sudo
+  tags:
+    - TRANSFER
+  tasks:
+    ############################
+    # WEX file DNA 랜딩존 이동
+    ############################
+    - name: "▶ 10-2. Passit Export Data Transfer"
+      shell: |
+        sh /home/esadmin/lcia_ifi/sh/wexExport.sh
+        sh /home/esadmin/lcia_ifi/sh/wexNewWord.sh
+        sh /home/esadmin/lcia_ifi/sh/wexFacebook.sh
+      register: ansibleresult
+      async: 1200
+      poll: 0
+
+    - name: "▶ 10-2. Check : WEX Passit Data Transfer & Search Reset"
+      async_status: jid={{ ansibleresult.ansible_job_id }}
+      ignore_errors: True
+      register: job_result
+      until: job_result.finished
+      retries: 120
+      delay: 10
+
+    - name: "▶ 10-2. Result : WEX Passit Data Transfer & Search Reset"
+      debug:
+        msg:
+          - "{{ job_result.stdout }}"
+          - "Ѱ {{ lookup('pipe','date +%Y-%m-%d/%H:%M:%S') }}"
+
+

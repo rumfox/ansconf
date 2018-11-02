@@ -6,88 +6,9 @@
 ##########################################################################################
 ---
 ############################################################
-# WEX 크롤러 시작전 Indexer 상태 확인
-# Waiting 상태인지 확인하고 크롤러 시작으로 넘어감
-# 2018.08.10. 로직 추가
-############################################################
-- name: "● 8-0-1 Indexer 상태확인 : {{ sessionid }} "
-  shell: |
-    . /opt/IBM/es/nodeinfo/esprofile
-    esadmin {{ sessionid | regex_replace('(\.[^.]*)') | string }}.indexservice.node1 getIndexBuildStatusAll > /home/esadmin/ansible_wex/wex_idxstatus.log
-    esadmin {{ sessionid | regex_replace('(\.[^.]*)') | string }}.indexservice.node2 getIndexBuildStatusAll >> /home/esadmin/ansible_wex/wex_idxstatus.log
-    esadmin {{ sessionid | regex_replace('(\.[^.]*)') | string }}.indexservice.node3 getIndexBuildStatusAll >> /home/esadmin/ansible_wex/wex_idxstatus.log
-    /home/esadmin/ansible_wex/wex_indexbuild_status.py
-    cat /home/esadmin/ansible_wex/wex_idxstatus.dat
-  register: statuscheck
-  ignore_errors: yes
-  until: >
-    statuscheck.stdout.find("WAITINGWAITINGWAITINGWAITINGWAITINGWAITING") != -1 or statuscheck.stdout.find("WAITINGWAITINGWAITING") != -1
-  retries: 80
-  delay: 45
-
-- name: "● 8-0-1 Indexer 상태확인 : {{ sessionid }} 결과값"
-  debug:
-    msg:
-      - "● 8-7M WEX Crawling session : {{ sessionid }} indexing result (1)"
-      - "------------------------------"
-      - "  {{ lookup('pipe','date +%Y-%m-%d/%H:%M:%S') }}"
-      - "------------------------------"
-
-############################################################
 # 크롤러 & 크롤링 시작
 # Session ID별 순차실행 (Includer파일에서 호출)
-# 매월 2일 전월 Session ID (Main) 크롤링 동시 실행 : 18.11.01적용
 ############################################################
-
-#############################################
-# FACEBOOK-REPLY
-# 1월 2일 전월 Session 크롤링 Fire & Forget
-#############################################
-- name: "▶ 8-1. Start WEX Cralwer(전년 FACEBOOK-REPLY)"
-  shell: cat /home/esadmin/ansible_wex/wex_session_py.dat
-  register: crawling_lastyear_session
-  when: ansible_date_time.month == "01" 
-        and ansible_date_time.day == "02"
-        and sessionid.find("FACEBOOK-REPLY") != -1
-
-- name: "● 8-1 Start WEX Cralwer(매월 2일, 전월 1시간데이터 크롤링)"
-  shell: |
-    . /opt/IBM/es/nodeinfo/esprofile
-    esadmin {{ crawling_lastyear_session.stdout }} start
-    esadmin {{ crawling_lastyear_session.stdout }} startCrawl -options 3
-  ignore_errors: yes
-  async: 1200
-  poll: 0
-  when: ansible_date_time.month == "01" 
-        and ansible_date_time.day == "02" 
-        and crawling_lastyear_session.stdout is defined 
-        and sessionid.find("FACEBOOK-REPLY") != -1
-
-#############################################
-# Main 
-# 매월 2일 전월 Session 크롤링 Fire & Forget
-#############################################
-- name: "▶ 8-1. Start WEX Cralwer(Last Month Main6)"
-  shell: cat /home/esadmin/ansible_wex/wex_session_pm.dat
-  register: crawling_lastmonth_session
-  when: ansible_date_time.day == "02"
-        and sessionid.find("Main") != -1
-
-- name: "● 8-1 Start WEX Cralwer(매월 2일, 전월 1시간데이터 크롤링)"
-  shell: |
-    . /opt/IBM/es/nodeinfo/esprofile
-    esadmin {{ crawling_lastmonth_session.stdout }} start
-    esadmin {{ crawling_lastmonth_session.stdout }} startCrawl -options 3
-  ignore_errors: yes
-  async: 1200
-  poll: 0
-  when: ansible_date_time.day == "02" 
-        and crawling_lastmonth_session.stdout is defined 
-        and sessionid.find("Main") != -1
-
-#############################################
-# 당월 Session 크롤링 작업
-#############################################
 - name: "● 8-1 Start WEX Cralwer"
   shell: |
     . /opt/IBM/es/nodeinfo/esprofile 
@@ -180,7 +101,7 @@
   register: statuscheck
   ignore_errors: yes
   until: >
-    statuscheck.stdout.find("INDEXINGINDEXINGINDEXINGINDEXINGINDEXINGINDEXING") != -1 or statuscheck.stdout.find("INDEXINGINDEXINGINDEXING") != -1
+    statuscheck.stdout.find("INDEXINGINDEXINGINDEXING") != -1
   retries: 30
   delay: 20
   when: idxfilecheck.stdout.find("EXIST") != -1 
@@ -210,7 +131,7 @@
   register: statuscheck
   ignore_errors: yes
   until: >
-    statuscheck.stdout.find("WAITINGWAITINGWAITINGWAITINGWAITINGWAITING") != -1 or statuscheck.stdout.find("WAITINGWAITINGWAITING") != -1
+    statuscheck.stdout.find("WAITINGWAITINGWAITING") != -1
   retries: 600
   delay: 45
   when: idxfilecheck.stdout.find("EXIST") != -1 
@@ -242,8 +163,8 @@
   register: statuscheck
   ignore_errors: yes
   until: >
-    statuscheck.stdout.find("INDEXINGINDEXINGINDEXINGINDEXINGINDEXINGINDEXING") != -1 or statuscheck.stdout.find("INDEXINGINDEXINGINDEXING") != -1
-  retries: 30
+    statuscheck.stdout.find("INDEXINGINDEXINGINDEXING") != -1
+  retries: 27
   delay: 20
   when: idxfilecheck.stdout.find("EXIST") != -1 and sessionid | regex_replace('(\.[^.]*)') | string == "Main6"
 
@@ -273,7 +194,7 @@
   register: statuscheck
   ignore_errors: yes
   until: >
-    statuscheck.stdout.find("WAITINGWAITINGWAITINGWAITINGWAITINGWAITING") != -1 or statuscheck.stdout.find("WAITINGWAITINGWAITING") != -1
+    statuscheck.stdout.find("WAITINGWAITINGWAITING") != -1
   retries: 600
   delay: 45
   when: idxfilecheck.stdout.find("EXIST") != -1 and sessionid | regex_replace('(\.[^.]*)') | string == "Main6" 

@@ -45,7 +45,7 @@
 
 #############################################################
 # 작업내용 : WEX VM 시작 후 SSH연결 상태 확인 
-# Woking Server : WEX 01,02,03번
+# Woking Server : WEX 01,02,03,04번
 # lcia-dnawex01,lcia-dnawex02,lcia-dnawex03
 #############################################################
 - hosts: lcia-dnawex01,lcia-dnawex02,lcia-dnawex03
@@ -74,6 +74,66 @@
           - "{{ job_result.ansible_facts.ansible_env.SSH_CONNECTION }}"
           - "Ѱ {{ lookup('pipe','date +%Y-%m-%d/%H:%M:%S') }}"
 
+#############################################################
+# 작업내용 : WEX VM 시작
+# Woking Server : WEX 04,05,06번
+#############################################################
+#- hosts: localhost
+#  tags:
+#    - VMON
+
+#  tasks:
+#    ############################################################
+#    # WEX VM 시작(2)
+#    ############################################################
+#    - name: "▶ 1-1. WEX VM Start REST API CALL(5,6번 VM) "
+#      uri:
+#        url: https://10.210.31.10:9440/api/nutanix/v2.0/vms/{{ item.vmuuid }}/set_power_state/
+#        method: POST
+#        user: admin
+#        password: Nutanix/4u!
+#        body: '{"transition": "ON", "uuid": "{{ item.vmuuid }}"}'
+#        validate_certs: no
+#        body_format: json
+#        force_basic_auth: yes
+#        status_code: 201
+#      register: job_result
+#      ignore_errors: yes
+#      with_items:
+#        - { vmuuid: 92989885-0d68-404b-9442-dd6abe2d3441 }
+#        - { vmuuid: cd021fb2-a445-44c9-a6a1-2bbfa7b6fc32 }
+#        - { vmuuid: 738a529c-31af-44a1-bf2a-5ca104b42c2e }
+
+#############################################################
+# 작업내용 : WEX VM 시작 후 SSH연결 상태 확인 
+# Woking Server : WEX 05,06번
+# lcia-dnawex05,lcia-dnawex06
+#############################################################
+#- hosts: lcia-dnawex05,lcia-dnawex06
+#  gather_facts: no
+#  tags:
+#    - VMON
+
+#  tasks:
+#    ############################################################
+#    # WEX VM Wait for system to become reachable
+#    ############################################################
+#    - name: "▶ 1-1-2. Wait 600 seconds, but only start checking after 100 seconds"
+#      wait_for_connection:
+#        delay: 100
+#        timeout: 300
+
+#    - name: VM Gather facts for first time
+#      setup:
+#      register: job_result
+
+#    - name: "▶ 2. WEX VM Start 후 접속상태"
+#      debug:
+#        msg:
+#          - "{{ job_result.ansible_facts.ansible_fqdn }}"
+#          - "{{ job_result.ansible_facts.ansible_hostname }}"
+#          - "{{ job_result.ansible_facts.ansible_env.SSH_CONNECTION }}"
+#          - "Ѱ {{ lookup('pipe','date +%Y-%m-%d/%H:%M:%S') }}"
 
 #############################################################
 # 작업내용 : WEX CCL 실행  
@@ -242,7 +302,15 @@
     ############################################################
 
     ###############################################
-    # 매월 1일 Main 전월 Session ID 크롤링
+    # 2일 이후 부터 당월 Session ID로 크롤링 실행  
+    ###############################################
+    - name: "▶ 8. Start WEX Cralwer & Indexing "
+      shell: cat /home/esadmin/ansible_wex/wex_session.dat
+      register: crawler_session
+      when: ansible_date_time.day != "01"
+
+    ###############################################
+    # 매월 1일 Main의 경우 전월 Session ID를 가져옴 
     ###############################################
     - name: "▶ 8. Start WEX Cralwer & Indexing (매월 1일 전월 크롤링)"
       shell: cat /home/esadmin/ansible_wex/wex_session_cm.dat
@@ -255,23 +323,41 @@
         - sessionid: "{{ item }}"
       with_items:
         - "{{ crawler_session.stdout_lines }}"
-      when: ansible_date_time.day == "01"
 
-    ###############################################
-    # 매월 2일 이후 Main 해당월 Session ID 크롤링   
-    ###############################################
-    - name: "▶ 8. Start WEX Cralwer & Indexing "
-      shell: cat /home/esadmin/ansible_wex/wex_session.dat
+    ###########################################
+    # 매월 2일 전월 마지막날 Main6 크롤링 
+    # 전월 마지막날 크롤링 대상 1시간 --> 크롤링 실행만 실킴
+    # 2018.11.01. 주석처리 및 전월 크롤링 실행 (fire & forget)
+    ###########################################
+    #- name: "▶ 8. Start WEX Cralwer(Last Month Main6)"
+    #  shell: cat /home/esadmin/ansible_wex/wex_session_pm.dat
+    #  register: crawler_session
+    #  when: ansible_date_time.day == "02"
+
+    #- name: "▶ 8. WEX 크롤링(Last Month Main6)"
+    #  include_tasks: wex_service_idx.yml
+    #  vars:
+    #    - sessionid: "{{ item }}"
+    #  with_items:
+    #    - "{{ crawler_session.stdout_lines }}"
+    #  when: ansible_date_time.day == "02"
+
+    ###########################################
+    # 매년 1월 2일 전년도 FaceBook Reply 크롤링
+    ###########################################
+    - name: "▶ 8. Start WEX Cralwer(Last Year FACEBOOK REPLY)"
+      shell: cat /home/esadmin/ansible_wex/wex_session_py.dat
       register: crawler_session
-      when: ansible_date_time.day != "01"
+      when: ansible_date_time.month == "01" and ansible_date_time.day == "02"
 
-    - name: "▶ 8. WEX 크롤링 & 인덱싱"
+    - name: "▶ 8. WEX 크롤링(Last Year FACEBOOK REPLY)"
       include_tasks: wex_service_idx.yml
       vars:
         - sessionid: "{{ item }}"
       with_items:
         - "{{ crawler_session.stdout_lines }}"
-      when: ansible_date_time.day != "01"
+      when: ansible_date_time.month == "01" and ansible_date_time.day == "02"
+
 
     ############################################################
     # 데이터 크롤링 상태 확인
